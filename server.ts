@@ -103,11 +103,12 @@ app.get('/api/stream-proxy', async (req, res) => {
 
   try {
     const urlObj = new URL(targetUrl);
+    let defaultAgent = (req.headers['user-agent'] as string) || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
+    if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(urlObj.hostname) || urlObj.port === '8080' || urlObj.port === '8000') {
+      defaultAgent = 'VLC/3.0.18 LibVLC/3.0.18';
+    }
     const headers: Record<string, string> = {
-      'User-Agent':
-        customAgent ||
-        (req.headers['user-agent'] as string) ||
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+      'User-Agent': customAgent || defaultAgent,
       Accept: '*/*',
       'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
     };
@@ -170,6 +171,12 @@ app.get('/api/stream-proxy', async (req, res) => {
       return res.send(rawText);
     }
 
+    const contentLength = upstreamResponse.headers.get('content-length');
+    if (contentLength === '0') {
+      console.warn('[StreamProxy] Fonte com conteúdo vazio (0 bytes):', targetUrl.slice(0, 80));
+      return res.status(502).json({ error: 'Fonte de streaming retornou 0 bytes' });
+    }
+
     // Forward binary media chunks (TS, MP4, AAC)
     res.status(upstreamResponse.status);
 
@@ -188,14 +195,20 @@ app.get('/api/stream-proxy', async (req, res) => {
       }
     }
     res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges, Content-Type');
 
     if (upstreamResponse.body) {
       // @ts-expect-error Node.js Readable fromWeb stream
       const nodeStream = Readable.fromWeb(upstreamResponse.body);
-      nodeStream.pipe(res);
-      req.on('close', () => {
+      nodeStream.on('error', () => {});
+      res.on('close', () => {
         controller.abort();
       });
+      res.on('error', () => {
+        controller.abort();
+      });
+      nodeStream.pipe(res);
     } else {
       res.end();
     }
@@ -213,50 +226,97 @@ app.get('/api/stream', async (req, res) => {
   const id = (req.query.id as string) || '';
   const versao = (req.query.versao as string) || 'dub';
 
-  // Dedicated stream resolution for Homem-Aranha: Um Novo Dia (ID: 969681 / 6250764)
-  // Resolves directly to the 7GB 4K [DV][HDR] movie stream
-  if (id === '969681' || id.startsWith('969681') || id === '6250764') {
-    const direct4kUrl = await resolveHomemAranhaUmNovoDia();
-    console.log('[API Stream] Homem-Aranha: Um Novo Dia (ID: 969681) resolvido para 4K HDR:', direct4kUrl);
-    return res.redirect(direct4kUrl);
-  }
-
-  const query = req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
-  const targetUrl = `https://saimo-tv.pages.dev/api/stream${query}`;
-
   try {
-    const response = await fetch(targetUrl, {
-      headers: {
-        'User-Agent': (req.headers['user-agent'] as string) || 'Mozilla/5.0 XerifePlayer/1.0',
-        Accept: '*/*',
-      },
-      redirect: 'manual',
-    });
+    let finalMediaUrl: string | null = null;
 
-    if (response.status === 302 || response.status === 301) {
-      const location = response.headers.get('location');
-      if (location) {
-        return res.redirect(location);
+    // Dedicated stream resolution for Homem-Aranha: Um Novo Dia (ID: 969681 / 6250764)
+    if (id === '969681' || id.startsWith('969681') || id === '6250764') {
+      finalMediaUrl = await resolveHomemAranhaUmNovoDia();
+      console.log('[API Stream] Homem-Aranha: Um Novo Dia resolvido para 4K HDR:', finalMediaUrl);
+    } else {
+      const query = req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
+      const targetUrl = `https://saimo-tv.pages.dev/api/stream${query}`;
+
+      const response = await fetch(targetUrl, {
+        headers: {
+          'User-Agent': (req.headers['user-agent'] as string) || 'Mozilla/5.0 XerifePlayer/1.0',
+          Accept: '*/*',
+        },
+        redirect: 'manual',
+      });
+
+      if (response.status === 302 || response.status === 301) {
+        const location = response.headers.get('location');
+        if (location) {
+          finalMediaUrl = location.replace(/^http:\/\//i, 'https://');
+        }
+      } else if (response.ok) {
+        finalMediaUrl = targetUrl;
       }
     }
 
-    if (response.status === 404 && (id === '969681' || id.includes('969681'))) {
-      const direct4kUrl = await resolveHomemAranhaUmNovoDia();
-      return res.redirect(direct4kUrl);
+    if (!finalMediaUrl) {
+      return res.status(404).json({ error: 'Fluxo não encontrado no resolvedor Saimo TV' });
     }
 
-    const contentType = response.headers.get('content-type') || 'application/json';
-    res.setHeader('Content-Type', contentType);
-    res.status(response.status);
+    // Fetch the final media stream directly with Range support and full CORS exposure
+    const mediaHeaders: Record<string, string> = {
+      'User-Agent': (req.headers['user-agent'] as string) || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      Accept: '*/*',
+    };
+    if (req.headers.range) {
+      mediaHeaders['Range'] = req.headers.range as string;
+    }
 
-    if (response.body) {
+    const mediaController = new AbortController();
+    const mediaTimeout = setTimeout(() => mediaController.abort(), 30000);
+
+    const mediaResponse = await fetch(finalMediaUrl, {
+      method: req.method === 'HEAD' ? 'HEAD' : 'GET',
+      headers: mediaHeaders,
+      signal: mediaController.signal,
+    });
+
+    clearTimeout(mediaTimeout);
+
+    res.status(mediaResponse.status);
+    for (const [key, val] of mediaResponse.headers.entries()) {
+      const lower = key.toLowerCase();
+      if (
+        lower === 'content-type' ||
+        lower === 'content-length' ||
+        lower === 'content-range' ||
+        lower === 'accept-ranges' ||
+        lower === 'cache-control' ||
+        lower === 'etag' ||
+        lower === 'last-modified' ||
+        lower === 'content-disposition'
+      ) {
+        res.setHeader(key, val);
+      }
+    }
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges, Content-Type, Content-Disposition');
+
+    if (req.method === 'HEAD') {
+      return res.end();
+    }
+
+    if (mediaResponse.body) {
       // @ts-expect-error Node.js Readable fromWeb stream
-      const nodeStream = Readable.fromWeb(response.body);
+      const nodeStream = Readable.fromWeb(mediaResponse.body);
+      nodeStream.on('error', () => {});
+      res.on('close', () => mediaController.abort());
+      res.on('error', () => mediaController.abort());
       nodeStream.pipe(res);
     } else {
       res.end();
     }
   } catch (err: any) {
+    if (err.name === 'AbortError') {
+      return res.status(504).json({ error: 'Timeout ao conectar com o servidor de vídeo' });
+    }
     console.error('[API Stream Error]:', err.message);
     res.status(502).json({ error: 'Falha no resolvedor de stream', details: err.message });
   }
