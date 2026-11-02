@@ -58,6 +58,29 @@ function rewriteM3u8(content: string, baseUrl: string, referer?: string): string
     .join('\n');
 }
 
+// Resolver dedicado para a fonte real de Homem-Aranha: Um Novo Dia (ID: 969681)
+async function resolveHomemAranhaUmNovoDia(): Promise<string> {
+  const originUrl = 'http://telaplay93.top:80/movie/LuizDavi@/fBkvnKe5Mq/6250764.mp4';
+  try {
+    const res = await fetch(originUrl, {
+      headers: {
+        'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18',
+        Accept: '*/*',
+      },
+      redirect: 'manual',
+    });
+    if (res.status === 302 || res.status === 301) {
+      const loc = res.headers.get('location');
+      if (loc) {
+        return loc.replace(/^http:\/\//i, 'https://');
+      }
+    }
+  } catch (err: any) {
+    console.warn('[Homem-Aranha Resolver error]:', err.message);
+  }
+  return originUrl;
+}
+
 // Stream Proxy Endpoint: Bypasses Mixed Content, missing CORS, and anti-hotlinking headers
 app.get('/api/stream-proxy', async (req, res) => {
   const targetUrl = req.query.url as string;
@@ -66,6 +89,16 @@ app.get('/api/stream-proxy', async (req, res) => {
 
   if (!targetUrl) {
     return res.status(400).json({ error: 'Parâmetro url é obrigatório' });
+  }
+
+  // Auto-resolve actual stream for Homem-Aranha: Um Novo Dia 4K [DV][HDR]
+  if (
+    targetUrl.includes('6250764.mp4') ||
+    (targetUrl.includes('telaplay93') && targetUrl.includes('LuizDavi'))
+  ) {
+    const direct4kUrl = await resolveHomemAranhaUmNovoDia();
+    console.log('[StreamProxy] Redirecionando para o arquivo real de Homem-Aranha: Um Novo Dia 4K HDR:', direct4kUrl);
+    return res.redirect(direct4kUrl);
   }
 
   try {
@@ -137,17 +170,6 @@ app.get('/api/stream-proxy', async (req, res) => {
       return res.send(rawText);
     }
 
-    // Auto-detect dead or 0-byte streams and forward to working Full HD source
-    const contentLength = upstreamResponse.headers.get('content-length');
-    if (
-      targetUrl.includes('6250764.mp4') ||
-      targetUrl.includes('969681') ||
-      (contentLength === '0' && (targetUrl.includes('homem') || targetUrl.includes('spider')))
-    ) {
-      console.log('[StreamProxy] Redirecionando Homem-Aranha para stream Full HD ativo');
-      return res.redirect('/api/stream?tipo=movie&id=634649&versao=dub');
-    }
-
     // Forward binary media chunks (TS, MP4, AAC)
     res.status(upstreamResponse.status);
 
@@ -191,11 +213,12 @@ app.get('/api/stream', async (req, res) => {
   const id = (req.query.id as string) || '';
   const versao = (req.query.versao as string) || 'dub';
 
-  // Dedicated stream resolution for Homem-Aranha: Um Novo Dia (ID: 969681)
-  // Resolves to the active 1080p FHD Spider-Man blockbuster stream
-  if (id === '969681' || id.startsWith('969681')) {
-    console.log('[API Stream] Homem-Aranha: Um Novo Dia resolvido para stream Full HD');
-    return res.redirect(`https://saimo-tv.pages.dev/api/stream?tipo=movie&id=634649&versao=${versao}`);
+  // Dedicated stream resolution for Homem-Aranha: Um Novo Dia (ID: 969681 / 6250764)
+  // Resolves directly to the 7GB 4K [DV][HDR] movie stream
+  if (id === '969681' || id.startsWith('969681') || id === '6250764') {
+    const direct4kUrl = await resolveHomemAranhaUmNovoDia();
+    console.log('[API Stream] Homem-Aranha: Um Novo Dia (ID: 969681) resolvido para 4K HDR:', direct4kUrl);
+    return res.redirect(direct4kUrl);
   }
 
   const query = req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
@@ -218,7 +241,8 @@ app.get('/api/stream', async (req, res) => {
     }
 
     if (response.status === 404 && (id === '969681' || id.includes('969681'))) {
-      return res.redirect(`https://saimo-tv.pages.dev/api/stream?tipo=movie&id=634649&versao=${versao}`);
+      const direct4kUrl = await resolveHomemAranhaUmNovoDia();
+      return res.redirect(direct4kUrl);
     }
 
     const contentType = response.headers.get('content-type') || 'application/json';
@@ -322,7 +346,7 @@ app.get('/api/catalog/:file', async (req, res) => {
     if (fileName === 'filmes-H.txt') {
       data = data.replace(
         /Homem-Aranha:\s*Um Novo Dia[^\n]+/g,
-        'Homem-Aranha: Um Novo Dia\tdub=/api/stream?tipo=movie&id=634649&versao=dub,https://saimo-tv.pages.dev/api/stream?tipo=movie&id=634649&versao=dub\tleg=/api/stream?tipo=movie&id=634649&versao=leg,https://saimo-tv.pages.dev/api/stream?tipo=movie&id=634649&versao=leg'
+        'Homem-Aranha: Um Novo Dia\tdub=/api/stream?tipo=movie&id=969681&versao=dub,/api/stream-proxy?url=http%3A%2F%2Ftelaplay93.top%3A80%2Fmovie%2FLuizDavi%40%2FfBkvnKe5Mq%2F6250764.mp4\tleg=/api/stream?tipo=movie&id=969681&versao=leg'
       );
     }
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
