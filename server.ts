@@ -139,6 +139,11 @@ app.get('/api/stream-proxy', async (req, res) => {
 
     clearTimeout(timeout);
 
+    // Preserve upstream failures so the player can try the next source.
+    if (!upstreamResponse.ok) {
+      return res.status(upstreamResponse.status).send('Fonte de vídeo indisponível');
+    }
+
     const contentType = upstreamResponse.headers.get('content-type') || '';
     const isM3u8 =
       contentType.includes('application/vnd.apple.mpegurl') ||
@@ -421,7 +426,9 @@ function optimizeCatalogo(content: string): string {
 app.get('/api/catalogo.txt', async (_req, res) => {
   try {
     const rawData = await fetchCachedText('https://canais-saimo.pages.dev/catalogo.txt', 'catalogo');
-    const data = optimizeCatalogo(rawData);
+    // Preserve each source and its associated metadata (referer, agent, quality,
+    // and keys). Reordering URLs separately corrupts those associations.
+    const data = rawData;
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('Cache-Control', 'public, max-age=1800');
     res.send(data);

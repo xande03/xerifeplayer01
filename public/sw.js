@@ -11,7 +11,7 @@
  *    (nunca cacheados — são grandes e dinâmicos)
  */
 
-const VERSION = 'xerife-v1.0.0-saimo';
+const VERSION = 'xerife-v1.0.1-playback';
 const SHELL_CACHE = `${VERSION}-shell`;
 const ASSET_CACHE = `${VERSION}-assets`;
 const DATA_CACHE = `${VERSION}-data`;
