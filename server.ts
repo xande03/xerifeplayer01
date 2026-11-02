@@ -350,11 +350,80 @@ async function fetchCachedText(url: string, cacheKey: string): Promise<string> {
   throw new Error(`Não foi possível carregar o catálogo ${cacheKey}`);
 }
 
+function optimizeCatalogo(content: string): string {
+  const lines = content.split('\n');
+  const output: string[] = [];
+  let currentBlock: string[] = [];
+
+  const processBlock = (block: string[]): string[] => {
+    if (!block.length) return [];
+    const fontes: string[] = [];
+    const otherLines: string[] = [];
+    for (const l of block) {
+      if (l.startsWith('fonte:')) {
+        const furl = l.split('fonte:', 2)[1]?.trim();
+        if (furl && !furl.includes('error.txt') && !furl.includes('dbonline.tech-cdn.top') && !furl.includes('6250764.mp4')) {
+          fontes.push(furl);
+        }
+      } else {
+        otherLines.push(l);
+      }
+    }
+
+    const highPrio = fontes.filter((f) =>
+      [
+        's1001604.lat',
+        '138.204.86.4',
+        '64.31.23.207',
+        '45.185.11.126',
+        '45.162.64.114',
+        'amagi.tv',
+        'otteravision',
+        'ecast.site',
+        'jmp2.uk',
+        'multtv',
+        'sua.tv',
+        'logicahost',
+        'uol.com.br',
+        'vhx.tv',
+        '170.83.',
+        '181.78.',
+      ].some((w) => f.includes(w))
+    );
+    const rest = fontes.filter((f) => !highPrio.includes(f) && !f.includes('cdn13embed'));
+    const lowPrio = fontes.filter((f) => !highPrio.includes(f) && !rest.includes(f));
+    const orderedFontes = Array.from(new Set([...highPrio, ...rest, ...lowPrio]));
+
+    const res: string[] = [];
+    for (const l of otherLines) {
+      res.push(l);
+      if (l.startsWith('canal:')) {
+        for (const f of orderedFontes) {
+          res.push(`fonte: ${f}`);
+        }
+      }
+    }
+    return res;
+  };
+
+  for (const l of lines) {
+    if (l.startsWith('canal:')) {
+      output.push(...processBlock(currentBlock));
+      currentBlock = [l];
+    } else {
+      currentBlock.push(l);
+    }
+  }
+  output.push(...processBlock(currentBlock));
+  return output.join('\n');
+}
+
 app.get('/api/catalogo.txt', async (_req, res) => {
   try {
-    const data = await fetchCachedText('https://canais-saimo.pages.dev/catalogo.txt', 'catalogo');
+    const rawData = await fetchCachedText('https://canais-saimo.pages.dev/catalogo.txt', 'catalogo');
+    const data = optimizeCatalogo(rawData);
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.setHeader('Cache-Control', 'public, max-age=1800');
     res.send(data);
   } catch (err: any) {
     res.status(502).send(err.message);
