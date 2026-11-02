@@ -1,0 +1,6 @@
+{
+  "name": "Xerife Player",
+  "description": "Reprodutor PWA de filmes, séries e canais ao vivo com alta performance e estabilidade.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

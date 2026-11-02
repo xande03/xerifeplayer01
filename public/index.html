@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0F172A" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="color-scheme" content="dark light" />
+
+    <!-- PWA / installability -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- iOS Specific Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Xerife Player" />
+    <meta name="format-detection" content="telephone=no" />
+    <link rel="apple-touch-icon" href="/pwa-192x192.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/pwa-192x192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/pwa-512x512.png" />
+    <link rel="apple-touch-startup-image" href="/pwa-512x512.png" />
+
+    <!-- Android Specific Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="Xerife Player" />
+    <meta name="msapplication-TileColor" content="#0F172A" />
+
+    <link rel="icon" type="image/png" href="/pwa-192x192.png">
+    <title>Xerife Player — Filmes, Séries e Canais ao Vivo</title>
+    <meta name="description" content="Filmes, séries e canais ao vivo do catálogo Saimo TV, com a interface Xerife Player.">
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Xerife Player — Filmes, Séries e Canais ao Vivo">
+    <meta name="twitter:title" content="Xerife Player — Filmes, Séries e Canais ao Vivo">
+    <meta property="og:description" content="Filmes, séries e canais ao vivo do catálogo Saimo TV, com a interface Xerife Player.">
+    <meta name="twitter:description" content="Filmes, séries e canais ao vivo do catálogo Saimo TV, com a interface Xerife Player.">
+    <meta property="og:image" content="https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/2650b6b9-abfc-4c95-976f-70d5ce119a68/id-preview-420d1acf--05a5654e-9733-4753-a2de-127f58a7e759.lovable.app-1774719406998.png">
+    <meta name="twitter:image" content="https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/2650b6b9-abfc-4c95-976f-70d5ce119a68/id-preview-420d1acf--05a5654e-9733-4753-a2de-127f58a7e759.lovable.app-1774719406998.png">
+    <meta name="twitter:card" content="summary_large_image">
+
+    <!-- Performance: preconnect para fonts + CDN de imagens (posters via weserv.nl) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://images.weserv.nl" crossorigin />
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin />
+    <!-- Fonte Inter no <head> (antes ficava em @import no CSS, que é render-blocking) -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1" async></script>
+    <script type="module" crossorigin src="/assets/index-D2TUpXDe.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BhFJmPEl.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
