@@ -235,7 +235,7 @@ app.get('/api/stream', async (req, res) => {
     let finalMediaUrl: string | null = null;
 
     // Dedicated stream resolution for Homem-Aranha: Um Novo Dia (ID: 969681 / 6250764)
-    if (id === '969681' || id.startsWith('969681') || id === '6250764') {
+    if (id === '969681' || id === '6250764') {
       finalMediaUrl = await resolveHomemAranhaUmNovoDia();
       console.log('[API Stream] Homem-Aranha: Um Novo Dia resolvido para 4K HDR:', finalMediaUrl);
     } else {
@@ -478,13 +478,7 @@ app.get('/api/catalog/:file', async (req, res) => {
   }
   const baseUrl = fileName === 'catalogo.txt' ? 'https://canais-saimo.pages.dev/' : 'https://filmes-saimo.pages.dev/';
   try {
-    let data = await fetchCachedText(`${baseUrl}${fileName}`, fileName);
-    if (fileName === 'filmes-H.txt') {
-      data = data.replace(
-        /Homem-Aranha:\s*Um Novo Dia[^\n]+/g,
-        'Homem-Aranha: Um Novo Dia\tdub=/api/stream?tipo=movie&id=969681&versao=dub,/api/stream-proxy?url=http%3A%2F%2Ftelaplay93.top%3A80%2Fmovie%2FLuizDavi%40%2FfBkvnKe5Mq%2F6250764.mp4\tleg=/api/stream?tipo=movie&id=969681&versao=leg'
-      );
-    }
+    const data = await fetchCachedText(`${baseUrl}${fileName}`, fileName);
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('Cache-Control', 'public, max-age=3600');
     res.send(data);
