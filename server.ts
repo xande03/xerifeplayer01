@@ -226,10 +226,10 @@ app.get('/api/stream-proxy', async (req, res) => {
       res.end();
     }
   } catch (err: any) {
-    if (err.name === 'AbortError') {
+    if (err.name === 'AbortError' || err.message?.includes('aborted')) {
       return res.status(504).json({ error: 'Timeout ao conectar com a fonte de streaming' });
     }
-    console.error('[StreamProxy Error]:', err.message);
+    console.warn('[StreamProxy Proxy Attempt]: Fonte remota indisponível:', err.message);
     return res.status(502).json({ error: 'Falha ao conectar com o stream remoto', details: err.message });
   }
 });

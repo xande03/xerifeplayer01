@@ -3,13 +3,13 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const bundle = fs.readFileSync('public/assets/index-xerife-catalog-v5.js', 'utf8');
+const bundle = fs.readFileSync('public/assets/index-xerife-catalog-v8.js', 'utf8');
 function between(start, end) {
   const a = bundle.indexOf(start), b = bundle.indexOf(end, a);
   assert.ok(a >= 0 && b > a, `Missing ${start}`);
   return bundle.slice(a, b);
 }
-const context = vm.createContext({ encodeURIComponent, Mf: () => ({ tmdbId: '10192' }) });
+const context = vm.createContext({ encodeURIComponent, window: { __XERIFE_PROXY__: true }, Mf: () => ({ tmdbId: '10192' }) });
 vm.runInContext(between('function Io(', 'function Mv(') + between('function ju(', 'function zh('), context);
 const movie = (titulo, urls) => ({kind:'f', titulo, fontes:{dub:urls}});
 const wrong = 'https://saimo-tv.pages.dev/api/stream?tipo=movie&id=10192&versao=dub';
