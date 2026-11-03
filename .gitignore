@@ -10,3 +10,4 @@ coverage/
 # Dados voláteis gerados a cada verificação diária
 public/data/RESUMO-diario.md
 dist/data/
+__pycache__/
