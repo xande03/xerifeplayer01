@@ -98,8 +98,12 @@ npm run dev        # servidor Express local com proxy na porta 3000
 
 ### O que mudou na versão v1.0.5-playback
 
-- `index-xerife-catalog-v6.js`: fontes de canais agora repassam `referer`/`agente`
-  ao proxy (antes eram descartados) e o player respeita a sonda `__XERIFE_PROXY__`;
+- `index-xerife-catalog-v6.js`: **correção principal do "Não foi possível iniciar a
+  reprodução"** — as fichas/destaques registram o título COM ano (`Resident Evil
+  (2026)`) mas os arquivos de letra guardam SEM ano (`Resident Evil`); a busca de
+  fontes agora compara as duas formas (filme e série). Também: fontes de canais
+  repassam `referer`/`agente` ao proxy (antes eram descartados) e o player respeita
+  a sonda `__XERIFE_PROXY__`;
 - `sw.js`: versão nova (`xerife-v1.0.5-playback`) e `/api/*` nunca mais vai para
   cache (antes o `index.html` do fallback SPA era cacheado como se fosse vídeo);
 - `server.ts` + `functions/api/stream-proxy.js`: respostas "fake-200" (HTML de
