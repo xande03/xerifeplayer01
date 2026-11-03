@@ -11,7 +11,7 @@
  *    (nunca cacheados — são grandes e dinâmicos)
  */
 
-const VERSION = 'xerife-v1.0.4-catalog';
+const VERSION = 'xerife-v1.0.5-playback';
 const SHELL_CACHE = `${VERSION}-shell`;
 const ASSET_CACHE = `${VERSION}-assets`;
 const DATA_CACHE = `${VERSION}-data`;
@@ -78,6 +78,9 @@ self.addEventListener('fetch', (event) => {
 
   // Streams de vídeo: sempre rede, sem cache
   if (isVideoRequest(url, request)) return;
+
+  // Endpoints /api da mesma origem (proxy de stream, status) — SEMPRE rede, nunca cache
+  if (url.origin === self.location.origin && url.pathname.startsWith('/api/')) return;
 
   // Navegação (HTML)
   if (request.mode === 'navigate') {

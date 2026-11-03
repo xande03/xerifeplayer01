@@ -49,7 +49,24 @@
     />
 
     <script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1" async></script>
-    <script type="module" crossorigin src="/assets/index-xerife-catalog-v5.js"></script>
+    <script>
+      // Xerife: sonda se existe backend /api (Express local ou Cloudflare Pages Functions).
+      // Define window.__XERIFE_PROXY__ antes do bundle carregar (deploy estático -> false).
+      (function () {
+        try {
+          var ctl = new AbortController();
+          var to = setTimeout(function () { ctl.abort(); }, 2500);
+          fetch('/api/status', { signal: ctl.signal, cache: 'no-store' })
+            .then(function (r) {
+              var ct = (r.headers.get('content-type') || '');
+              return ct.indexOf('json') >= 0 ? r.json() : null;
+            })
+            .then(function (j) { clearTimeout(to); window.__XERIFE_PROXY__ = !!(j && j.app === 'Xerife Player'); })
+            .catch(function () { clearTimeout(to); window.__XERIFE_PROXY__ = false; });
+        } catch (e) { window.__XERIFE_PROXY__ = false; }
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-xerife-catalog-v6.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-BhFJmPEl.css">
   </head>
   <body>

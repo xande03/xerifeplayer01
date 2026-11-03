@@ -172,8 +172,16 @@ app.get('/api/stream-proxy', async (req, res) => {
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         return res.send(rewritten);
       }
-      res.setHeader('Content-Type', contentType || 'text/plain');
-      return res.send(rawText);
+      // Fake-200: fonte respondeu 200 mas mandou HTML/texto (bloqueio geo, challenge
+      // Cloudflare, painel XUI etc.). Devolve 502 para o player trocar de fonte já.
+      console.warn('[StreamProxy] Fake-200 em playlist (sem #EXTM3U):', targetUrl.slice(0, 80));
+      return res.status(502).json({ error: 'Fonte retornou conteúdo inválido (não é uma playlist HLS válida)' });
+    }
+
+    // Fake-200 binário: content-type HTML indica bloqueio/challenge, não mídia.
+    if (contentType.includes('text/html')) {
+      console.warn('[StreamProxy] Fake-200 HTML (bloqueio geo/challenge):', targetUrl.slice(0, 80));
+      return res.status(502).json({ error: 'Fonte de vídeo bloqueada ou indisponível (resposta HTML)' });
     }
 
     const contentLength = upstreamResponse.headers.get('content-length');
