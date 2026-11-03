@@ -6,3 +6,7 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Dados voláteis gerados a cada verificação diária
+public/data/RESUMO-diario.md
+dist/data/

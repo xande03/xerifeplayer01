@@ -124,8 +124,120 @@
         } catch (e) { window.__XERIFE_PROXY__ = false; }
       })();
     </script>
+    <script>
+      // Xerife: atualização diária de fontes/IDs.
+      // 1) Carrega a lista de fontes mortas gerada hoje pela verificação
+      //    automática (GitHub Actions -> public/data/saude-fontes.json).
+      //    O player passa a tentar primeiro fontes saudáveis.
+      // 2) Se um catálogo do Saimo não responder, usa a última cópia boa
+      //    guardada no IndexedDB (fim do carregamento infinito).
+      (function () {
+        var DIA = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        window.__XERIFE_DIA__ = DIA;
+        window.__XERIFE_FONTES_MORTAS__ = null;
+
+        function aplicar(j, origem) {
+          try {
+            var lista = (j && j.hosts_mortos) || [], arr = [];
+            for (var i = 0; i < lista.length; i++) {
+              arr.push(typeof lista[i] === 'string' ? lista[i] : (lista[i] && lista[i].host));
+            }
+            arr = arr.filter(Boolean);
+            window.__XERIFE_FONTES_MORTAS__ = new Set(arr);
+            window.__XERIFE_DADOS__ = { dia: DIA, origem: origem,
+                                        gerado_em: j && j.gerado_em, mortas: arr.length };
+          } catch (e) { /* ignora */ }
+        }
+        function doDeploy() {
+          fetch('/data/saude-fontes.json?d=' + DIA, { cache: 'no-store' })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (j) { if (j) aplicar(j, 'deploy'); })
+            .catch(function () {});
+        }
+        try {
+          // Repo público: dados de hoje direto do GitHub (independe de redeploy)
+          fetch('https://raw.githubusercontent.com/xande03/xerifeplayer01/main/public/data/saude-fontes.json?d=' + DIA,
+                { cache: 'no-store' })
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(0); })
+            .then(function (j) { aplicar(j, 'github'); })
+            .catch(doDeploy);
+        } catch (e) { doDeploy(); }
+
+        // Cache de emergência dos catálogos (IndexedDB) + cache-busting diário
+        var dbP = null;
+        function db() {
+          if (!dbP) dbP = new Promise(function (res) {
+            try {
+              var rq = indexedDB.open('xerife-dados', 1);
+              rq.onupgradeneeded = function () { rq.result.createObjectStore('cat'); };
+              rq.onsuccess = function () { res(rq.result); };
+              rq.onerror = function () { res(null); };
+            } catch (e) { res(null); }
+          });
+          return dbP;
+        }
+        function idbGet(k) {
+          return db().then(function (d) {
+            return new Promise(function (res) {
+              if (!d) return res(null);
+              try {
+                var r = d.transaction('cat').objectStore('cat').get(k);
+                r.onsuccess = function () { res(r.result || null); };
+                r.onerror = function () { res(null); };
+              } catch (e) { res(null); }
+            });
+          });
+        }
+        function idbSet(k, v) {
+          return db().then(function (d) {
+            return new Promise(function (res) {
+              if (!d) return res();
+              try {
+                var t = d.transaction('cat', 'readwrite');
+                t.objectStore('cat').put(v, k);
+                t.oncomplete = function () { res(); };
+                t.onerror = function () { res(); };
+              } catch (e) { res(); }
+            });
+          });
+        }
+        if (window.fetch) {
+          var FETCH_ORIG = window.fetch.bind(window);
+          var EH_CATALOGO = /^https?:\/\/(filmes|canais)-saimo\.pages\.dev\/.+\.txt(\?|$)/i;
+          window.fetch = function (input, init) {
+            var url = typeof input === 'string' ? input : (input && input.url) || '';
+            if (!EH_CATALOGO.test(url)) return FETCH_ORIG(input, init);
+            var alvo = url.indexOf('d=') < 0
+              ? url + (url.indexOf('?') < 0 ? '?' : '&') + 'd=' + DIA : url;
+            var chave = 'cat:' + alvo.split('?')[0];
+            var ctl = new AbortController();
+            var to = setTimeout(function () { try { ctl.abort(); } catch (e) {} }, 25000);
+            var novoInit = Object.assign({}, init || {},
+                                         { cache: 'no-store', signal: ctl.signal });
+            return FETCH_ORIG(alvo, novoInit).then(function (r) {
+              clearTimeout(to);
+              if (!r.ok) throw new Error('HTTP ' + r.status);
+              return r.text().then(function (txt) {
+                if (txt && txt.length > 10 && txt.charAt(0) !== '<') idbSet(chave, txt);
+                return new Response(txt, { status: 200,
+                                           headers: { 'content-type': 'text/plain; charset=utf-8' } });
+              });
+            }).catch(function () {
+              clearTimeout(to);
+              return idbGet(chave).then(function (txt) {
+                if (txt) {
+                  return new Response(txt, { status: 200,
+                                             headers: { 'content-type': 'text/plain; charset=utf-8' } });
+                }
+                throw new Error('catalogo indisponivel e sem copia local');
+              });
+            });
+          };
+        }
+      })();
+    </script>
     <script src="/registerSW.js" defer></script>
-    <script type="module" crossorigin src="/assets/index-xerife-catalog-v6.js"></script>
+    <script type="module" crossorigin src="/assets/index-xerife-catalog-v7.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-BhFJmPEl.css">
   </head>
   <body>

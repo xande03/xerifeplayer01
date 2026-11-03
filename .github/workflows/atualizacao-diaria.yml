@@ -1,0 +1,84 @@
+name: Atualização diária de fontes
+
+# Roda todo dia às 08:00 UTC (05:00 horário de Brasília):
+#   1. Baixa os catálogos do Saimo (filmes, séries, canais, fichas/IDs)
+#   2. Testa amostras reais de fontes (episódios, filmes, canais)
+#   3. Grava public/data/saude-fontes.json + catalogo-status.json e envia commit
+#
+# O app carrega esses arquivos todo dia (direto do GitHub raw ou do deploy) e
+# passa a tentar primeiro as fontes saudáveis — menos "carregamento infinito",
+# menos "não foi possível iniciar a reprodução" e menos conteúdo inativo.
+
+on:
+  schedule:
+    - cron: '0 8 * * *' # 05:00 Brasília = 08:00 UTC
+  workflow_dispatch: {} # botão "Run workflow" na aba Actions
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atualizacao-diaria
+  cancel-in-progress: false
+
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    env:
+      # Opcionais: se configurados nos secrets do repo, o deploy do Cloudflare
+      # Pages é atualizado automaticamente após a verificação diária.
+      CLOUDFLARE_DEPLOY_HOOK: ${{ secrets.CLOUDFLARE_DEPLOY_HOOK }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Atualizar catálogos e verificar fontes
+        run: python3 scripts/atualizacao_diaria.py
+
+      - name: Publicar resumo no job
+        if: always()
+        run: |
+          if [ -f public/data/RESUMO-diario.md ]; then
+            cat public/data/RESUMO-diario.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Commit e push dos dados atualizados
+        run: |
+          git config user.name "xerife-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/data/saude-fontes.json public/data/catalogo-status.json
+          if git diff --cached --quiet; then
+            echo "Nada mudou desde a última verificação."
+          else
+            git commit -m "chore(dados): atualização diária de fontes ($(date -u +%d/%m/%Y))"
+            git push
+          fi
+
+      # ---- Opcionais: reimplantar no Cloudflare Pages com os dados do dia ----
+      - name: Redeploy via Deploy Hook (opcional)
+        if: env.CLOUDFLARE_DEPLOY_HOOK != ''
+        continue-on-error: true
+        run: |
+          curl -sS -X POST "$CLOUDFLARE_DEPLOY_HOOK" \
+            -o /dev/null -w "Deploy hook: HTTP %{http_code}\n"
+
+      - name: Node 20 (para wrangler, opcional)
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Deploy direto no Cloudflare Pages (opcional)
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
+        continue-on-error: true
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+          npx wrangler pages deploy dist --project-name=xerife-player --branch=main

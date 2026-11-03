@@ -85,15 +85,18 @@ Requisitos:
 
 > Observação: as fontes de vídeo são streams públicos e podem oscilar;
 > o player troca para a fonte seguinte automaticamente quando uma falha.
+> Desde a v1.0.6 o app também **se atualiza diariamente** (fontes e IDs):
+> veja **[ATUALIZACAO-DIARIA.md](ATUALIZACAO-DIARIA.md)**.
 
 ## 🔧 Reconstruir o app (opcional)
 
-O código-fonte está no projeto (`src/` + bundle `public/assets/index-xerife-catalog-v6.js`):
+O código-fonte está no projeto (`src/` + bundle `public/assets/index-xerife-catalog-v7.js`):
 
 ```bash
 npm install
 npm run build      # gera dist/
 npm run dev        # servidor Express local com proxy na porta 3000
+npm run atualizar-fontes   # verificação manual de fontes (gera public/data/)
 ```
 
 ### O que mudou na versão v1.0.5-playback
@@ -112,3 +115,21 @@ npm run dev        # servidor Express local com proxy na porta 3000
   imediatamente em vez de travar em "Tente novamente";
 - `functions/`: proxy serverless para a Cloudflare Pages (deploy estático volta a
   ter o mesmo poder do servidor Express).
+
+### O que mudou na versão v1.0.6-diario (atualização diária)
+
+- **Atualização diária automática** — workflow GitHub Actions
+  (`.github/workflows/atualizacao-diaria.yml`, 05:00 Brasília) roda
+  `scripts/atualizacao_diaria.py`: baixa os catálogos, testa amostras reais de
+  fontes e grava `public/data/saude-fontes.json` (hosts mortos/instáveis e
+  IDs de conteúdo inativo) + `catalogo-status.json`. Detalhes em
+  **[ATUALIZACAO-DIARIA.md](ATUALIZACAO-DIARIA.md)**;
+- `index-xerife-catalog-v7.js`: o player tenta primeiro fontes de hosts
+  saudáveis (lê `window.__XERIFE_FONTES_MORTAS__`); hosts mortos só entram
+  como último recurso;
+- `index.html`: script de atualização diária — carrega a lista de fontes
+  mortas (GitHub raw → fallback no deploy), cache-busting diário dos
+  catálogos do Saimo e cópia de emergência no IndexedDB (fim do
+  carregamento infinito quando o servidor de catálogo cai);
+- `sw.js`: versão `xerife-v1.0.6-diario` (raiz sincronizada com public);
+- `package.json`: atalho `npm run atualizar-fontes`.
